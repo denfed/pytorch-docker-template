@@ -15,4 +15,4 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - .:/home/src
+      - ./workspace/:/home/src
