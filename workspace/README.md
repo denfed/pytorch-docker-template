@@ -1,5 +1,5 @@
-# PyTorch Docker Template Project
-PyTorch deep learning project made easy, this time with nvidia-docker.
+# PyTorch Template Project
+PyTorch deep learning project made easy.
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
@@ -33,14 +33,10 @@ PyTorch deep learning project made easy, this time with nvidia-docker.
 <!-- /code_chunk_output -->
 
 ## Requirements
-* [Docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/)
-* [Nvidia-docker 2.0](https://cnvrg.io/how-to-setup-docker-and-nvidia-docker-2-0-on-ubuntu-18-04/)
-* pip and apt requirements are automatically added into the container by the `(pip|apt)_requirements.txt` files.
-
-## Running the Container
-* `make build` - Performs a clean build of the container.
-* `make run` - Starts the container in a Jupyterlab environment.
-* `make terminal` - Starts the container with a bash shell. 
+* Python >= 3.5 (3.6 recommended)
+* PyTorch >= 0.4 (1.2 recommended)
+* tqdm (Optional for `test.py`)
+* tensorboard >= 1.14 (see [Tensorboard Visualization](#tensorboard-visualization))
 
 ## Features
 * Clear folder structure which is suitable for many deep learning projects.
@@ -54,13 +50,15 @@ PyTorch deep learning project made easy, this time with nvidia-docker.
 
 ## Folder Structure
   ```
-  workspace/
+  pytorch-template/
   │
   ├── train.py - main script to start training
   ├── test.py - evaluation of trained model
   │
   ├── config.json - holds configuration for training
   ├── parse_config.py - class to handle config file and cli options
+  │
+  ├── new_project.py - initialize new project with template files
   │
   ├── base/ - abstract base classes
   │   ├── base_data_loader.py
@@ -362,9 +360,19 @@ Feel free to contribute any kind of function or enhancement, here the coding sty
 
 Code should pass the [Flake8](http://flake8.pycqa.org/en/latest/) check before committing.
 
+## TODOs
+
+- [ ] Multiple optimizers
+- [ ] Support more tensorboard functions
+- [x] Using fixed random seed
+- [x] Support pytorch native tensorboard
+- [x] `tensorboardX` logger support
+- [x] Configurable logging layout, checkpoint naming
+- [x] Iteration-based training (instead of epoch-based)
+- [x] Adding command line option for fine-tuning
+
 ## License
-This project is licensed under the GNU GENERAL PUBLIC LICENSE. See  LICENSE for more details
+This project is licensed under the MIT License. See  LICENSE for more details
 
 ## Acknowledgements
 This project is inspired by the project [Tensorflow-Project-Template](https://github.com/MrGemy95/Tensorflow-Project-Template) by [Mahmoud Gemy](https://github.com/MrGemy95)
-and [pytorch-template](https://github.com/victoresque/pytorch-template) by [victoresque](https://github.com/victoresque)
