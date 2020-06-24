@@ -1,0 +1,18 @@
+version: '2.3'
+
+services:
+  pytorch-env:
+    runtime: nvidia
+    image: pytorch-env
+    ipc: host
+    build:
+      context: .
+      args:
+        - UID
+        - GID
+        - USER_PASSWORD
+    command: bash -c "jupyter lab --ip=0.0.0.0 --NotebookApp.token='' --NotebookApp.password='' --allow-root"
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/home/src
