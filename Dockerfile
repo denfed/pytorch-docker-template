@@ -24,7 +24,7 @@ RUN cat apt_requirements.txt | xargs apt install -y
 RUN rm apt_requirements.txt
 
 # Cache pytorch so it doesn't re-download on requirements change
-RUN pip install torch
+RUN pip3 install torch
 
 # Global Python Dependencies
 COPY pip_requirements.txt $HOME/pip_requirements.txt
