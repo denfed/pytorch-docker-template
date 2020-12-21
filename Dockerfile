@@ -12,8 +12,6 @@ RUN groupmod -g ${GID} container_user
 RUN echo container_user:${USER_PASSWORD} | chpasswd
 RUN usermod -aG sudo container_user
 
-
-
 RUN mkdir /home/src
 WORKDIR /home/src
 ENV HOME /home/src
@@ -24,6 +22,9 @@ RUN apt update
 COPY apt_requirements.txt $HOME/apt_requirements.txt
 RUN cat apt_requirements.txt | xargs apt install -y
 RUN rm apt_requirements.txt
+
+# Cache pytorch so it doesn't re-download on requirements change
+RUN pip install torch
 
 # Global Python Dependencies
 COPY pip_requirements.txt $HOME/pip_requirements.txt
