@@ -2,6 +2,10 @@
     "name": "Mnist_LeNet",
     "n_gpu": 1,
 
+    "wandb": {
+        "project": "mnist"
+    },
+
     "arch": {
         "type": "MnistModel",
         "args": {}

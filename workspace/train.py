@@ -2,12 +2,9 @@ import argparse
 import collections
 import torch
 import numpy as np
-import data_loader.data_loaders as module_data
-import model.loss as module_loss
-import model.metric as module_metric
-import model.model as module_arch
 from parse_config import ConfigParser
-from trainer import Trainer
+import wandb
+import os
 
 
 # fix random seeds for reproducibility
@@ -18,32 +15,45 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
 def main(config):
+    # Initialize wandb run
+    wandb.init(project=config['wandb']['project'],
+           entity="wandb",
+           config=config)
+
+    # import local dependencies
+    import data_loader as module_data
+    import model.loss as module_loss
+    import model.metric as module_metric
+    import trainer as module_trainer
+    import model as module_arch
+    
     logger = config.get_logger('train')
 
     # setup data_loader instances
     data_loader = config.init_obj('data_loader', module_data)
-    valid_data_loader = data_loader.split_validation()
+    # setup custom validation dataloader if defined in config file
+    if config._config.get('valid_data_loader') is not None:
+        valid_data_loader = config.init_obj('valid_data_loader', module_data)
+        valid_data_loader.training = False
+    else:
+        valid_data_loader = data_loader.split_validation()
 
     # build model architecture, then print to console
     model = config.init_obj('arch', module_arch)
     logger.info(model)
 
     # get function handles of loss and metrics
-    criterion = getattr(module_loss, config['loss'])
+    criterion = config.init_ftn('loss', module_loss)
     metrics = [getattr(module_metric, met) for met in config['metrics']]
 
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = config.init_obj('optimizer', torch.optim, trainable_params)
 
-    lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
+    trainer_args = [model, criterion, metrics, optimizer]
+    trainer_kwargs = {"config": config, "data_loader": data_loader, "valid_data_loader": valid_data_loader}
 
-    trainer = Trainer(model, criterion, metrics, optimizer,
-                      config=config,
-                      data_loader=data_loader,
-                      valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler)
-
+    trainer = getattr(module_trainer, config['trainer']['type'])(*trainer_args, **trainer_kwargs)
     trainer.train()
 
 
@@ -59,6 +69,7 @@ if __name__ == '__main__':
     # custom cli options to modify configuration from default values given in json file.
     CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
     options = [
+        CustomArgs(['--n', '--name'], type=str, target='name'),
         CustomArgs(['--lr', '--learning_rate'], type=float, target='optimizer;args;lr'),
         CustomArgs(['--bs', '--batch_size'], type=int, target='data_loader;args;batch_size')
     ]

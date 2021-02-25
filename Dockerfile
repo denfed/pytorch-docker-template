@@ -26,6 +26,12 @@ RUN rm apt_requirements.txt
 # Cache pytorch so it doesn't re-download on requirements change
 RUN pip3 install torch
 
+# Wandb Integration
+RUN pip3 install --upgrade Wandb
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+RUN wandb login --host=<your host> <your key>
+
 # Global Python Dependencies
 COPY pip_requirements.txt $HOME/pip_requirements.txt
 RUN pip3 install -r pip_requirements.txt
