@@ -18,19 +18,22 @@ ENV HOME /home/src
 
 RUN apt update
 
-# Global Apt Dependencies
-COPY apt_requirements.txt $HOME/apt_requirements.txt
-RUN cat apt_requirements.txt | xargs apt install -y
-RUN rm apt_requirements.txt
+# Install Python
+RUN apt install python3 python3-pip
 
 # Cache pytorch so it doesn't re-download on requirements change
 RUN pip3 install torch
 
 # Wandb Integration
-RUN pip3 install --upgrade Wandb
+RUN pip3 install --upgrade wandb
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
-RUN wandb login --host=<your host> <your key>
+RUN wandb login --host=<host> <key>
+
+# Global Apt Dependencies
+COPY apt_requirements.txt $HOME/apt_requirements.txt
+RUN cat apt_requirements.txt | xargs apt install -y
+RUN rm apt_requirements.txt
 
 # Global Python Dependencies
 COPY pip_requirements.txt $HOME/pip_requirements.txt
