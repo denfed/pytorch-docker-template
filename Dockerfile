@@ -23,6 +23,15 @@ COPY apt_requirements.txt $HOME/apt_requirements.txt
 RUN cat apt_requirements.txt | xargs apt install -y
 RUN rm apt_requirements.txt
 
+# Update pip3
+RUN pip3 install --upgrade pip
+
+# Install wandb and initialize
+RUN pip3 install --upgrade wandb
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+RUN wandb login --host=<host> <key>
+
 # Cache pytorch so it doesn't re-download on requirements change
 RUN pip3 install torch
 

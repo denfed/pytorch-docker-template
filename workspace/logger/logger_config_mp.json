@@ -29,7 +29,7 @@
         }
     },
     "root": {
-        "level": "DEBUG",
-        "handlers": ["console", "info_file_handler"]
+        "level": "INFO",
+        "handlers": ["info_file_handler"]
     }
 }

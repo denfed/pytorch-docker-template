@@ -1,81 +1,163 @@
+import os
 import argparse
+import collections
+
 import torch
+import torch.nn as nn
+from torchvision.utils import make_grid, save_image
+import pandas as pd
+from sklearn.manifold import TSNE
+from sklearn.utils.class_weight import compute_class_weight
+import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
-import data_loader.data_loaders as module_data
-import model.loss as module_loss
-import model.metric as module_metric
-import model.model as module_arch
+
+from base import Cross_Valid
+from logger import get_logger
+import models.loss as module_loss
+import models.metric as module_metric
+from models.metric import MetricTracker
 from parse_config import ConfigParser
+from utils import ensure_dir, prepare_device, get_by_path, msg_box
+
+# fix random seeds for reproducibility
+SEED = 123
+torch.manual_seed(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(SEED)
 
 
 def main(config):
-    logger = config.get_logger('test')
+    k_fold = config['trainer'].get('k_fold', 1)
+    fold_idx = config['trainer'].get('fold_idx', 0)
 
-    # setup data_loader instances
-    data_loader = getattr(module_data, config['data_loader']['type'])(
-        config['data_loader']['args']['data_dir'],
-        batch_size=512,
-        shuffle=False,
-        validation_split=0.0,
-        training=False,
-        num_workers=2
-    )
+    logger = get_logger('test')
+    test_msg = msg_box("TEST")
+    logger.debug(test_msg)
 
-    # build model architecture
-    model = config.init_obj('arch', module_arch)
-    logger.info(model)
+    # datasets
+    test_datasets = dict()
+    keys = ['datasets', 'test']
+    for name in get_by_path(config, keys):
+        test_datasets[name] = config.init_obj([*keys, name], 'data_loaders')
 
-    # get function handles of loss and metrics
-    loss_fn = getattr(module_loss, config['loss'])
-    metric_fns = [getattr(module_metric, met) for met in config['metrics']]
-
-    logger.info('Loading checkpoint: {} ...'.format(config.resume))
-    checkpoint = torch.load(config.resume)
-    state_dict = checkpoint['state_dict']
-    if config['n_gpu'] > 1:
-        model = torch.nn.DataParallel(model)
-    model.load_state_dict(state_dict)
+    # data_loaders
+    test_data_loaders = dict()
+    keys = ['data_loaders', 'test']
+    for name in get_by_path(config, keys):
+        dataset = test_datasets[name]
+        do_transform = get_by_path(config, [*keys, name]).get('do_transform', False)
+        if do_transform:
+            dataset.transform()
+        test_data_loaders[name] = config.init_obj([*keys, name], 'data_loaders', dataset)
 
     # prepare model for testing
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
-    model.eval()
+    device, device_ids = prepare_device(config['n_gpu'])
 
-    total_loss = 0.0
-    total_metrics = torch.zeros(len(metric_fns))
+    Cross_Valid.create_CV(k_fold, fold_idx)
+    for fold_idx in range(1, k_fold + 1):
+        # models
+        if k_fold > 1:
+            fold_prefix = f'fold_{fold_idx}_'
+            dirname = os.path.dirname(config.resume)
+            basename = os.path.basename(config.resume)
+            resume = os.path.join(dirname, fold_prefix + basename)
+        else:
+            resume = config.resume
+        logger.info(f"Loading model: {resume} ...")
+        checkpoint = torch.load(resume)
+        models = dict()
+        logger_model = get_logger('model', verbosity=0)
+        for name in config['models']:
+            model = config.init_obj(['models', name], 'models')
+            logger_model.info(model)
+            state_dict = checkpoint['models'][name]
+            if config['n_gpu'] > 1:
+                model = torch.nn.DataParallel(model)
+            model.load_state_dict(state_dict)
+            model = model.to(device)
+            model.eval()
+            models[name] = model
 
-    with torch.no_grad():
-        for i, (data, target) in enumerate(tqdm(data_loader)):
-            data, target = data.to(device), target.to(device)
-            output = model(data)
+        # losses
+        kwargs = {}
+        # TODO
+        if config['losses']['loss'].get('balanced', False):
+            target = test_datasets['data'].y_test
+            weight = compute_class_weight(class_weight='balanced',
+                                          classes=target.unique(),
+                                          y=target)
+            weight = torch.FloatTensor(weight).to(device)
+            kwargs.update(pos_weight=weight[1])
+        loss_fn = config.init_obj(['losses', 'loss'], module_loss, **kwargs)
 
-            #
-            # save sample images, or do something with output here
-            #
+        # metrics
+        metrics_iter = [getattr(module_metric, met) for met in config['metrics']['per_iteration']]
+        metrics_epoch = [getattr(module_metric, met) for met in config['metrics']['per_epoch']]
+        keys_loss = ['loss']
+        keys_iter = [m.__name__ for m in metrics_iter]
+        keys_epoch = [m.__name__ for m in metrics_epoch]
+        test_metrics = MetricTracker(keys_loss + keys_iter, keys_epoch)
 
-            # computing loss, metrics on test set
-            loss = loss_fn(output, target)
-            batch_size = data.shape[0]
-            total_loss += loss.item() * batch_size
-            for i, metric in enumerate(metric_fns):
-                total_metrics[i] += metric(output, target) * batch_size
+        with torch.no_grad():
+            print("testing...")
+            model = models['model']
+            testloader = test_data_loaders['data']
+            if len(metrics_epoch) > 0:
+                outputs = torch.FloatTensor().to(device)
+                targets = torch.FloatTensor().to(device)
+            for batch_idx, (data, target) in enumerate(testloader):
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                if len(metrics_epoch) > 0:
+                    outputs = torch.cat((outputs, output))
+                    targets = torch.cat((targets, target))
 
-    n_samples = len(data_loader.sampler)
-    log = {'loss': total_loss / n_samples}
-    log.update({
-        met.__name__: total_metrics[i].item() / n_samples for i, met in enumerate(metric_fns)
-    })
-    logger.info(log)
+                #
+                # save sample images, or do something with output here
+                #
+
+                # computing loss, metrics on test set
+                loss = loss_fn(output, target)
+                test_metrics.iter_update('loss', loss.item())
+                for met in metrics_iter:
+                    test_metrics.iter_update(met.__name__, met(output, target))
+
+            for met in metrics_epoch:
+                test_metrics.epoch_update(met.__name__, met(outputs, targets))
+
+        test_log = test_metrics.result()
+        logger.info(test_log)
+        # cross validation is enabled
+        if k_fold > 1:
+            log_mean = test_log['mean']
+            idx = Cross_Valid.fold_idx
+            save_path = config.save_dir['metric'] / f"fold_{idx}.pkl"
+            log_mean.to_pickle(save_path)
+            Cross_Valid.next_fold()
 
 
 if __name__ == '__main__':
-    args = argparse.ArgumentParser(description='PyTorch Template')
-    args.add_argument('-c', '--config', default=None, type=str,
-                      help='config file path (default: None)')
-    args.add_argument('-r', '--resume', default=None, type=str,
-                      help='path to latest checkpoint (default: None)')
-    args.add_argument('-d', '--device', default=None, type=str,
-                      help='indices of GPUs to enable (default: all)')
+    args = argparse.ArgumentParser(description='testing')
+    run_args = args.add_argument_group('run_args')
+    run_args.add_argument('-c', '--config', default="configs/examples/mnist.json", type=str)
+    run_args.add_argument('--resume', default=None, type=str)
+    run_args.add_argument('--mode', default='test', type=str)
+    run_args.add_argument('--run_id', default=None, type=str)
+    run_args.add_argument('--log_name', default=None, type=str)
 
-    config = ConfigParser.from_args(args)
-    main(config)
+    # custom cli options to modify configuration from default values given in json file.
+    mod_args = args.add_argument_group('mod_args')
+    CustomArgs = collections.namedtuple('CustomArgs', "flags default type target")
+    options = [
+    ]
+    for opt in options:
+        mod_args.add_argument(*opt.flags, default=opt.default, type=opt.type)
+
+    # additional arguments for testing
+    test_args = args.add_argument_group('test_args')
+    test_args.add_argument('--output_path', default=None, type=str)
+
+    cfg = ConfigParser.from_args(args, options)
+    main(cfg)

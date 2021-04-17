@@ -1,5 +1,5 @@
 # PyTorch Template Project
-PyTorch deep learning project made easy.
+A pytorch template files generator, which supports multiple instances of dataset, dataloader, model, optimizer, loss, optimizer and lr_scheduler.
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
@@ -16,11 +16,12 @@ PyTorch deep learning project made easy.
     * [Using Multiple GPU](#using-multiple-gpu)
 	* [Customization](#customization)
 		* [Custom CLI options](#custom-cli-options)
+		* [Dataset](#data-loader)
 		* [Data Loader](#data-loader)
 		* [Trainer](#trainer)
 		* [Model](#model)
 		* [Loss](#loss)
-		* [metrics](#metrics)
+		* [Metrics](#metrics)
 		* [Additional logging](#additional-logging)
 		* [Validation data](#validation-data)
 		* [Checkpoints](#checkpoints)
@@ -33,122 +34,254 @@ PyTorch deep learning project made easy.
 <!-- /code_chunk_output -->
 
 ## Requirements
-* Python >= 3.5 (3.6 recommended)
-* PyTorch >= 0.4 (1.2 recommended)
-* tqdm (Optional for `test.py`)
-* tensorboard >= 1.14 (see [Tensorboard Visualization](#tensorboard-visualization))
+* Bash (Linux)
+* Python >= 3.6
+* requirements.txt
 
 ## Features
 * Clear folder structure which is suitable for many deep learning projects.
 * `.json` config file support for convenient parameter tuning.
+* Support multi-dataset, multi-dataloader, multi-model, multi-optimizer, multi-loss, multi-optimizer and multi-lr\_scheduler.
+And all of above can be constructed in `.json` config!
+* By adding symbolic to /usr/local/bin, you can execute `torch_new_project.py` under all paths.
 * Customizable command line options for more convenient parameter tuning.
 * Checkpoint saving and resuming.
 * Abstract base classes for faster development:
-  * `BaseTrainer` handles checkpoint saving/resuming, training process logging, and more.
+  * `BaseTrainer` handles checkpoint saving/resuming, training process logging, and initialize all kinds of objects.
   * `BaseDataLoader` handles batch generation, data shuffling, and validation data splitting.
-  * `BaseModel` provides basic model summary.
+  * `BaseModel` : currently not implemented.
+* Additional features compared with [pytorch-template](https://github.com/victoresque/pytorch-template):
+
+### Enable multiple instances in datasets, data_loaders, models, losses, optimizers, lr_schedulers
+Multiple datasets like domain adaption training will use source dataset and target dataset, so do data_loaders.
+Multiple models like GAN. Generator and Discriminator.
+Multiple losses, optimizers, lr_schedulers can be found in many ML papers.
+
+### train/valid/test
+If the paths of train/valid/test are already given, they can be directly put in the section in datasets, data_loaders.
+
+### module/type
+When there are more than one module, for example,
+- `data_loaders/first_loader.py` and `data_loaders/second_loader.py`
+- `trainers/first_trainer.py` and `trainers/second_trainer.py`
+- `models/model1.py` and `models/model2.py` \\
+Each of them has some classes. In `parse_config.py`, ConfigParser.init_obj() can automatically import the specified class by using importlib.
+
+### AUROC/AUPRC
+In metric part, I add two commonly used metrics AUROC/AUPRC. These two metrics need to be computed on whole epoch, so the compute method is different from accuracy.
+
+### MetricTracker
+Continue from AUROC/AUPRC, I revise the MetricTracker, which is moved to `models/metric.py`.
+The MetricTracker can record both accuracy-like metric (metrics_iter) and AUROC-like (metrics_epoch) metric.
+
+### Cross validation
+Cross validation are supported.
+Class `Cross_Valid` in `base/base_dataloader.py` records the index of cross validation.
+The models and metric results of each fold are saved.
+`ensemble.py` can ensemble k-fold validation results.
+Also, multi-process cross validation is supported, which allows you to run many folds simultaneously in the background.
+
+### Examples
+I add some example codes to use the above features.
+- MNIST dataset
+- ImageNet dataset (The data need to be downloaded by yourself)
+- Adult dataset
 
 ## Folder Structure
   ```
-  pytorch-template/
+  Pytorch-Template/
+  │
+  ├── parse_config.py - class to handle config file and cli options
   │
   ├── train.py - main script to start training
   ├── test.py - evaluation of trained model
   │
-  ├── config.json - holds configuration for training
-  ├── parse_config.py - class to handle config file and cli options
-  │
-  ├── new_project.py - initialize new project with template files
+  ├── ensemble.py - ensemble k-fold results
   │
   ├── base/ - abstract base classes
   │   ├── base_data_loader.py
-  │   ├── base_model.py
   │   └── base_trainer.py
   │
-  ├── data_loader/ - anything about data loading goes here
-  │   └── data_loaders.py
+  ├── configs/ - configurations for training
+  │   ├── dataset_model.json
+  │   └── examples/
+  │       └── *.json
   │
   ├── data/ - default directory for storing input data
   │
-  ├── model/ - models, losses, and metrics
-  │   ├── model.py
-  │   ├── metric.py
-  │   └── loss.py
-  │
-  ├── saved/
-  │   ├── models/ - trained models are saved here
-  │   └── log/ - default logdir for tensorboard and logging output
-  │
-  ├── trainer/ - trainers
-  │   └── trainer.py
+  ├── data_loaders/ - anything about data loading goes here
+  │   ├── data_loader.py
+  │   └── examples/
+  │       └── *_loader.py
   │
   ├── logger/ - module for tensorboard visualization and logging
   │   ├── visualization.py
   │   ├── logger.py
   │   └── logger_config.json
+  │
+  ├── models/ - models, losses, and metrics
+  │   ├── model.py
+  │   ├── metric.py
+  │   ├── loss.py
+  │   └── examples/
+  │       └── *.py
+  │
+  ├── saved/
+  │   └── EXP_name/
+  │       └── run_id/
+  │           ├── models/ - trained models are saved here
+  │           ├── log/ - default logdir for tensorboard and logging output   
+  │           └── dataset_model.json - backup config file when start training
+  │
+  ├── scripts/ - scripts for *.sh
+  │   ├── new_project/
+  │   │   ├── copy_exclude - exclude file when create new project
+  │   │   └── torch_new_project.sh - initialize new project with template files
+  │   ├── run/
+  │   │   ├── examples.sh - bash script for running examples
+  │   │   └── run.sh - bash script for running experiment
+  │   └── version_update/
+  │       ├── file_list - files to preserve between update
+  │       └── version_update.sh - transfer old version files to new version directory
+  │
+  ├── trainers/ - trainers
+  │   ├── trainer.py
+  │   └── examples/
+  │       └── *_trainer.py
   │  
   └── utils/ - small utility functions
       ├── util.py
-      └── ...
+      └── examples/
+          └── *.py
   ```
 
+## Count Lines of Codes
+- wc
+`wc -l **/*.* *.*`
+- cloc
+`sudo apt install cloc`
+`cloc --vcs=git --by-file`
+
 ## Usage
-The code in this repo is an MNIST example of the template.
-Try `python train.py -c config.json` to run code.
+There are some examples config files in `config/examples/`. Try `bash run_examples.sh` to run code.
 
 ### Config file format
-Config files are in `.json` format:
+Config files are in `.json` format, `dataset_model.json`:
 ```javascript
 {
-  "name": "Mnist_LeNet",        // training session name
-  "n_gpu": 1,                   // number of GPUs to use for training.
-  
-  "arch": {
-    "type": "MnistModel",       // name of model architecture to train
-    "args": {
+    "n_gpu": 1,
+    "root_dir": "./",
+    "name": "dataset_model",
 
-    }                
-  },
-  "data_loader": {
-    "type": "MnistDataLoader",         // selecting data loader
-    "args":{
-      "data_dir": "data/",             // dataset path
-      "batch_size": 64,                // batch size
-      "shuffle": true,                 // shuffle training data before splitting
-      "validation_split": 0.1          // size of validation dataset. float(portion) or int(number of samples)
-      "num_workers": 2,                // number of cpu processes to be used for data loading
+    "datasets": {
+        "train": {
+            "data": {
+                "module": ".data_loader",
+                "type": "MyDataset",
+                "kwargs": {
+                    "data_dir": "./data",
+                    "label_path": null,
+                    "mode": "train"
+                }
+            }
+        },
+        "valid": {
+        },
+        "test": {
+            "data": {
+                "module": ".data_loader",
+                "type": "MyDataset",
+                "kwargs": {
+                    "data_dir": "./data",
+                    "label_path": null,
+                    "mode": "test"
+                }
+            }
+        }
+    },
+    "data_loaders": {
+        "train": {
+            "data": {
+                "module": ".data_loader",
+                "type": "BaseDataLoader",
+                "kwargs": {
+                    "validation_split": 0.2,
+                    "DataLoader_kwargs": {
+                        "batch_size": 64,
+                        "shuffle": true,
+                        "num_workers": 4
+                    },
+                    "do_transform": true
+                }
+            }
+        },
+        "valid": {
+        },
+        "test": {
+            "data": {
+                "module": ".data_loader",
+                "type": "DataLoader",
+                "kwargs": {
+                    "batch_size": 64,
+                    "shuffle": false,
+                    "num_workers": 4
+                },
+                "do_transform": true
+            }
+        }
+    },
+    "models": {
+        "model": {
+            "module": ".model",
+            "type": "MyModel"
+        }
+    },
+    "losses": {
+        "loss": {
+            "type": "nll_loss"
+        }
+    },
+    "metrics": {
+        "per_iteration": ["accuracy"],
+        "per_epoch": ["AUROC", "AUPRC"]
+    },
+    "optimizers": {
+        "model": {
+            "type": "Adam",
+            "kwargs": {
+                "lr": 0.001
+            }
+        }
+    },
+    "lr_schedulers": {
+        "model": {
+            "type": "StepLR",
+            "kwargs": {
+                "step_size": 50,
+                "gamma": 0.1
+            }
+        }
+    },
+    "trainer": {
+        "module": ".trainer",
+        "type": "Trainer",
+        "k_fold": 5,
+        "fold_idx": 0,
+        "kwargs": {
+            "finetune": false,
+            "epochs": 2,
+            "len_epoch": null,
+
+            "save_period": 5,
+            "save_the_best": true,
+            "verbosity": 2,
+
+            "monitor": "max val_accuracy",
+            "early_stop": 0,
+
+            "tensorboard": false
+        }
     }
-  },
-  "optimizer": {
-    "type": "Adam",
-    "args":{
-      "lr": 0.001,                     // learning rate
-      "weight_decay": 0,               // (optional) weight decay
-      "amsgrad": true
-    }
-  },
-  "loss": "nll_loss",                  // loss
-  "metrics": [
-    "accuracy", "top_k_acc"            // list of metrics to evaluate
-  ],                         
-  "lr_scheduler": {
-    "type": "StepLR",                  // learning rate scheduler
-    "args":{
-      "step_size": 50,          
-      "gamma": 0.1
-    }
-  },
-  "trainer": {
-    "epochs": 100,                     // number of training epochs
-    "save_dir": "saved/",              // checkpoints are saved in save_dir/models/name
-    "save_freq": 1,                    // save checkpoints every save_freq epochs
-    "verbosity": 2,                    // 0: quiet, 1: per epoch, 2: full
-  
-    "monitor": "min val_loss"          // mode and metric for model performance monitoring. set 'off' to disable.
-    "early_stop": 10	                 // number of epochs to wait before early stop. set 0 to disable.
-  
-    "tensorboard": true,               // enable tensorboard visualization
-  }
 }
 ```
 
@@ -163,7 +296,6 @@ Modify the configurations in `.json` config files, then run:
 
 ### Resuming from checkpoints
 You can resume from a previously saved checkpoint by:
-
   ```
   python train.py --resume path/to/checkpoint
   ```
@@ -183,9 +315,15 @@ Specify indices of available GPUs by cuda environmental variable.
 ## Customization
 
 ### Project initialization
-Use the `new_project.py` script to make your new project directory with template files.
-`python new_project.py ../NewProject` then a new project folder named 'NewProject' will be made.
-This script will filter out unneccessary files like cache, git files or readme file. 
+Use the `torch_new_project.sh` script to make your new project directory with template files.
+
+Add this line to ~/.bashrc:
+`export Pytorch_Template=/path/to/Pytorch_Template`
+Add symbolic link at /usr/local/bin so that you can run this script everywhere.
+`sudo ln -s $Pytorch_Template/scripts/new_project/torch_new_project.sh /usr/local/bin/torch_new_project`
+
+`torch_new_project ProjectName` produces a new project folder named 'ProjectName' will be made.
+This script will filter out unneccessary files listed in `copy_exclude`.
 
 ### Custom CLI options
 
@@ -199,13 +337,13 @@ you can change some of them using CLI flags.
   # simple class-like object having 3 attributes, `flags`, `type`, `target`.
   CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
   options = [
-      CustomArgs(['--lr', '--learning_rate'], type=float, target=('optimizer', 'args', 'lr')),
-      CustomArgs(['--bs', '--batch_size'], type=int, target=('data_loader', 'args', 'batch_size'))
+      CustomArgs(['--lr', '--learning_rate'], type=float, target="optimizer;args;lr"),
+      CustomArgs(['--bs', '--batch_size'], type=int, target="data_loader;args;batch_size")
       # options added here can be modified by command line flags.
   ]
   ```
 `target` argument should be sequence of keys, which are used to access that option in the config dict. In this example, `target` 
-for the learning rate option is `('optimizer', 'args', 'lr')` because `config['optimizer']['args']['lr']` points to the learning rate.
+for the learning rate option is `"optimizer;args;lr"` because `config['optimizer']['args']['lr']` points to the learning rate.
 `python train.py -c config.json --bs 256` runs training with options given in `config.json` except for the `batch size`
 which is increased to 256 by command line options.
 
@@ -232,7 +370,7 @@ which is increased to 256 by command line options.
   ```
 * **Example**
 
-  Please refer to `data_loader/data_loaders.py` for an MNIST data loading example.
+  Please refer to `data_loaders/examples/MNIST_loader.py` for an MNIST data loading example.
 
 ### Trainer
 * **Writing your own trainer**
@@ -253,7 +391,7 @@ which is increased to 256 by command line options.
 
 * **Example**
 
-  Please refer to `trainer/trainer.py` for MNIST training.
+  Please refer to `trainers/trainer.py` for MNIST training.
 
 * **Iteration-based training**
 
@@ -274,7 +412,7 @@ which is increased to 256 by command line options.
 
 * **Example**
 
-  Please refer to `model/model.py` for a LeNet example.
+  Please refer to `models/examples/LeNet.py` for a LeNet example.
 
 ### Loss
 Custom loss functions can be implemented in 'model/loss.py'. Use them by changing the name given in "loss" in config file, to corresponding name.
@@ -284,7 +422,10 @@ Metric functions are located in 'model/metric.py'.
 
 You can monitor multiple metrics by providing a list in the configuration file, e.g.:
   ```json
-  "metrics": ["accuracy", "top_k_acc"],
+  "metrics": {
+      "per_iteration": ["accuracy", "top_k_acc"],
+      "per_epoch": ["AUROC", "AUPRC"]
+  }
   ```
 
 ### Additional logging
@@ -309,22 +450,20 @@ The `validation_split` can be a ratio of validation set per total data(0.0 <= fl
 ### Checkpoints
 You can specify the name of the training session in config files:
   ```json
-  "name": "MNIST_LeNet",
+  name: MNIST_LeNet,
   ```
 
-The checkpoints will be saved in `save_dir/name/timestamp/checkpoint_epoch_n`, with timestamp in mmdd_HHMMSS format.
+The checkpoints will be saved in `saved/name/run_id/model/checkpoint_epoch_n`, with timestamp in mmdd\_HHMMSS format.
 
 A copy of config file will be saved in the same folder.
 
 **Note**: checkpoints contain:
   ```python
   {
-    'arch': arch,
-    'epoch': epoch,
-    'state_dict': self.model.state_dict(),
-    'optimizer': self.optimizer.state_dict(),
-    'monitor_best': self.mnt_best,
-    'config': self.config
+      'epoch': epoch,
+      'models': {key: value.state_dict() for key, value in self.models.items()},
+      'optimizers': {key: value.state_dict() for key, value in self.optimizers.items()},
+      'monitor_best': self.mnt_best,
   }
   ```
 
@@ -333,7 +472,7 @@ This template supports Tensorboard visualization by using either  `torch.utils.t
 
 1. **Install**
 
-    If you are using pytorch 1.1 or higher, install tensorboard by 'pip install tensorboard>=1.14.0'.
+    If you are using pytorch 1.1 or higher, install tensorboard by `pip install tensorboard>=1.14.0`.
 
     Otherwise, you should install tensorboardx. Follow installation guide in [TensorboardX](https://github.com/lanpa/tensorboardX).
 
@@ -347,7 +486,7 @@ This template supports Tensorboard visualization by using either  `torch.utils.t
 
 3. **Open Tensorboard server** 
 
-    Type `tensorboard --logdir saved/log/` at the project root, then server will open at `http://localhost:6006`
+    Type `tensorboard --logdir saved/EXP/run_id/log/` at the project root, then server will open at `http://localhost:6006`
 
 By default, values of loss and metrics specified in config file, input images, and histogram of model parameters will be logged.
 If you need more visualizations, use `add_scalar('tag', data)`, `add_image('tag', image)`, etc in the `trainer._train_epoch` method.
@@ -362,17 +501,8 @@ Code should pass the [Flake8](http://flake8.pycqa.org/en/latest/) check before c
 
 ## TODOs
 
-- [ ] Multiple optimizers
+- [ ] Revise errors in trainer/examples and test\_examples/
 - [ ] Support more tensorboard functions
-- [x] Using fixed random seed
-- [x] Support pytorch native tensorboard
-- [x] `tensorboardX` logger support
-- [x] Configurable logging layout, checkpoint naming
-- [x] Iteration-based training (instead of epoch-based)
-- [x] Adding command line option for fine-tuning
-
-## License
-This project is licensed under the MIT License. See  LICENSE for more details
 
 ## Acknowledgements
-This project is inspired by the project [Tensorflow-Project-Template](https://github.com/MrGemy95/Tensorflow-Project-Template) by [Mahmoud Gemy](https://github.com/MrGemy95)
+This project is forked and enhanced from the project [pytorch-template](https://github.com/victoresque/pytorch-template)

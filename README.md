@@ -368,3 +368,5 @@ This project is licensed under the GNU GENERAL PUBLIC LICENSE. See  LICENSE for 
 ## Acknowledgements
 This project is inspired by the project [Tensorflow-Project-Template](https://github.com/MrGemy95/Tensorflow-Project-Template) by [Mahmoud Gemy](https://github.com/MrGemy95)
 and [pytorch-template](https://github.com/victoresque/pytorch-template) by [victoresque](https://github.com/victoresque)
+
+A new version of this template is also taken from the fork [Pytorch-Template](https://github.com/deeperlearner/Pytorch-Template) by [deeperlearner](https://github.com/deeperlearner)

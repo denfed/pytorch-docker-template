@@ -4,6 +4,12 @@ workspace/.jupyter
 workspace/.local
 workspace/.python_history
 
+*data/
+log
+output/
+__pycache__/
+saved/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

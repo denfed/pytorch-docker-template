@@ -1,0 +1,9 @@
+data
+*examples*
+.git
+output
+__pycache__
+README.md
+saved
+scripts/new_project
+Session.vim

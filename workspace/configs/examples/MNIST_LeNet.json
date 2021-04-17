@@ -1,0 +1,108 @@
+{
+    "n_gpu": 1,
+    "root_dir": "./",
+    "name": "MNIST_LeNet",
+
+    "datasets": {
+        "train": {
+            "data": {
+                "module": ".examples.MNIST_loader",
+                "type": "MNISTTrainset",
+                "kwargs": {
+                    "data_dir": "./data/MNIST"
+                }
+            }
+        },
+        "valid": {
+        },
+        "test": {
+            "data": {
+                "module": ".examples.MNIST_loader",
+                "type": "MNISTTestset",
+                "kwargs": {
+                    "data_dir": "./data/MNIST"
+                }
+            }
+        }
+    },
+    "data_loaders": {
+        "train": {
+            "data": {
+                "module": ".examples.MNIST_loader",
+                "type": "BaseDataLoader",
+                "kwargs": {
+                    "validation_split": 0.2,
+                    "DataLoader_kwargs": {
+                        "batch_size": 64,
+                        "shuffle": true,
+                        "num_workers": 4
+                    }
+                }
+            }
+        },
+        "valid": {
+        },
+        "test": {
+            "data": {
+                "module": ".examples.MNIST_loader",
+                "type": "DataLoader",
+                "kwargs": {
+                    "batch_size": 64,
+                    "shuffle": false,
+                    "num_workers": 4
+                }
+            }
+        }
+    },
+    "models": {
+        "model": {
+            "module": ".examples.LeNet",
+            "type": "LeNet"
+        }
+    },
+    "losses": {
+        "loss": {
+            "is_ftn": true,
+            "type": "nll_loss"
+        }
+    },
+    "metrics": {
+        "per_iteration": ["accuracy", "top_k_acc"],
+        "per_epoch": []
+    },
+    "optimizers": {
+        "model": {
+            "type": "Adam",
+            "kwargs": {
+                "lr": 0.001
+            }
+        }
+    },
+    "lr_schedulers": {
+        "model": {
+            "type": "StepLR",
+            "kwargs": {
+                "step_size": 50,
+                "gamma": 0.1
+            }
+        }
+    },
+    "trainer": {
+        "module": ".trainer",
+        "type": "Trainer",
+        "kwargs": {
+            "finetune": false,
+            "epochs": 2,
+            "len_epoch": null,
+
+            "save_period": 1,
+            "save_the_best": true,
+            "verbosity": 2,
+
+            "monitor": "min val_loss",
+            "early_stop": 10,
+
+            "tensorboard": false
+        }
+    }
+}
